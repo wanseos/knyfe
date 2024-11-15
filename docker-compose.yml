@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: env/postgres.env
+    volumes:
+      - postgres_knyfe_data:/var/lib/postgresql/data
+    secrets:
+      - postgres_knyfe_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  knyfe:
+    build:
+      dockerfile: Dockerfile
+    command: "tail -f /dev/null"
+    volumes:
+      - ./knyfe:/usr/src/app
+      - .poetry/venv:/usr/src/app/.venv
+      - .poetry/cache:/root/.cache/pypoetry
+    ports:
+      - 8000:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+secrets:
+  postgres_knyfe_password:
+    file: ./env/postgres_knyfe_password
+
+volumes:
+  postgres_knyfe_data:
