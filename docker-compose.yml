@@ -16,7 +16,10 @@ services:
   knyfe:
     build:
       dockerfile: Dockerfile
-    command: "tail -f /dev/null"
+    env_file: env/knyfe.env
+    command: >
+      sh -c "poetry install --no-interaction --no-ansi --no-root --no-cache &&
+            python3 manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./knyfe:/usr/src/app
       - .poetry/venv:/usr/src/app/.venv
