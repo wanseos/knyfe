@@ -26,7 +26,7 @@ class BookingTests(APITestCase):
             username="nonadmin2",
             password="password",
         )
-        Booking.objects.create(
+        cls.booking = Booking.objects.create(
             key=uuid.uuid4(),
             starts_at="2022-01-01T00:00:00Z",
             ends_at="2022-01-01T01:00:00Z",
@@ -56,3 +56,25 @@ class BookingTests(APITestCase):
         response = self.client.get(BASE_URL)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)
+
+    def test_retrieve_booking_by_non_logged_in(self):
+        response = self.client.get(f"{BASE_URL}1/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_retrieve_booking_by_non_admin(self):
+        self.client.login(username="nonadmin1", password="password")
+        booking_key = self.booking.key
+        response = self.client.get(f"{BASE_URL}{booking_key}/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_retrieve_booking_by_non_owner(self):
+        self.client.login(username="nonadmin2", password="password")
+        booking_key = self.booking.key
+        response = self.client.get(f"{BASE_URL}{booking_key}/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_retrieve_booking_by_admin(self):
+        self.client.login(username="admin", password="password")
+        booking_key = self.booking.key
+        response = self.client.get(f"{BASE_URL}{booking_key}/")
+        self.assertEqual(response.status_code, 200)
