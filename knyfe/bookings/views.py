@@ -1,4 +1,5 @@
 from rest_framework import permissions, viewsets, response, serializers
+from django.shortcuts import get_object_or_404
 
 from bookings.models import Booking
 
@@ -25,7 +26,12 @@ class BookingViewSet(viewsets.ViewSet):
         pass
 
     def retrieve(self, request, pk=None):
-        pass
+        qs = Booking.objects.all().only("key", "starts_at", "ends_at", "applicants")
+        if not request.user.is_staff:
+            qs = qs.filter(owner=request.user)
+        obj = get_object_or_404(qs, key=pk)
+        serializer = BookingSerializer(obj)
+        return response.Response(serializer.data)
 
     def update(self, request, pk=None):
         pass
