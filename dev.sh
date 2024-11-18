@@ -19,7 +19,10 @@ case "$subcommand" in
     docker volume rm knyfe_postgres_knyfe_data
     ;;
   test)
-    docker compose exec knyfe manage.py test --keepdb $@
+    docker compose exec knyfe manage.py test $@
+    ;;
+  manage.py)
+    docker compose exec knyfe manage.py $@
     ;;
   *)
     echo "Unknown subcommand: $subcommand"
