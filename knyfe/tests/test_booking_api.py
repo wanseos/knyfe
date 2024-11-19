@@ -184,3 +184,31 @@ class BookingTests(APITestCase):
         }
         response = self.client.patch(f"{BASE_URL}{key}/", data)
         self.assertEqual(response.status_code, 200)
+
+    def test_delete_booking_by_non_logged_in(self):
+        response = self.client.delete(f"{BASE_URL}1/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_delete_pending_booking_by_non_owner(self):
+        self.client.login(username="nonadmin2", password="password")
+        key = self.pending_booking.key
+        response = self.client.delete(f"{BASE_URL}{key}/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_pending_booking_by_owner(self):
+        self.client.login(username="nonadmin1", password="password")
+        key = self.pending_booking.key
+        response = self.client.delete(f"{BASE_URL}{key}/")
+        self.assertEqual(response.status_code, 204)
+
+    def test_delete_confirmed_booking_by_owner(self):
+        self.client.login(username="nonadmin2", password="password")
+        key = self.confirmed_booking.key
+        response = self.client.delete(f"{BASE_URL}{key}/")
+        self.assertEqual(response.status_code, 400)
+
+    def test_delete_confirmed_booking_by_admin(self):
+        self.client.login(username="admin", password="password")
+        key = self.confirmed_booking.key
+        response = self.client.delete(f"{BASE_URL}{key}/")
+        self.assertEqual(response.status_code, 204)
