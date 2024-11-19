@@ -56,6 +56,13 @@ class BookingTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
 
+    def test_list_bookings_by_admin_performance(self):
+        self.client.login(username="admin", password="password")
+        with self.assertNumQueries(3):
+            # django session, user, and booking queries
+            response = self.client.get(BASE_URL)
+            self.assertEqual(response.status_code, 200)
+
     def test_list_bookings_by_admin(self):
         self.client.login(username="admin", password="password")
         response = self.client.get(BASE_URL)
