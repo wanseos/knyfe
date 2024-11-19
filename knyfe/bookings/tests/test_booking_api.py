@@ -88,7 +88,7 @@ class BookingTests(APITestCase):
         response = self.client.post(BASE_URL, {})
         self.assertEqual(response.status_code, 403)
 
-    def test_create_invalid_booking_by_non_admin(self):
+    def test_create_approved_booking_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
         data = {
             "starts_at": "2026-01-01T00:00:00Z",
@@ -97,7 +97,8 @@ class BookingTests(APITestCase):
             "status": "APPROVED",
         }
         response = self.client.post(BASE_URL, data)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["status"], "PENDING")
+        self.assertEqual(response.status_code, 201)
 
     def test_create_booking_with_invalid_starts_at_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
@@ -186,7 +187,8 @@ class BookingTests(APITestCase):
             "status": "APPROVED",
         }
         response = self.client.patch(f"{BASE_URL}{key}/", data)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["status"], "PENDING")
+        self.assertEqual(response.status_code, 200)
 
     def test_partial_update_pending_booking_status_by_admin(self):
         self.client.login(username="admin", password="password")
@@ -195,6 +197,16 @@ class BookingTests(APITestCase):
             "status": "APPROVED",
         }
         response = self.client.patch(f"{BASE_URL}{key}/", data)
+        # Status should be atomically updated using `approve` action.
+        # Unknown or read-only fields are ignored.
+        self.assertEqual(response.data["status"], "PENDING")
+        self.assertEqual(response.status_code, 200)
+
+    def test_approve_booking_by_admin(self):
+        self.client.login(username="admin", password="password")
+        key = self.pending_booking.key
+        response = self.client.patch(f"{BASE_URL}{key}/approve/")
+        self.assertEqual(response.data["status"], "APPROVED")
         self.assertEqual(response.status_code, 200)
 
     def test_delete_booking_by_non_logged_in(self):
