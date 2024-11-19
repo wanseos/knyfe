@@ -1,3 +1,4 @@
+from django.utils import timezone
 import uuid
 from rest_framework.test import APITestCase
 
@@ -96,6 +97,18 @@ class BookingTests(APITestCase):
         }
         response = self.client.post(BASE_URL, data)
         self.assertEqual(response.status_code, 403)
+
+    def test_create_booking_with_invalid_starts_at_by_non_admin(self):
+        self.client.login(username="nonadmin1", password="password")
+        current_datetime = timezone.now()
+        invalid_start_at = current_datetime - timezone.timedelta(days=1)
+        data = {
+            "starts_at": invalid_start_at,
+            "ends_at": invalid_start_at + timezone.timedelta(hours=1),
+            "applicants": 1,
+        }
+        response = self.client.post(BASE_URL, data)
+        self.assertEqual(response.status_code, 400)
 
     def test_create_booking_over_capacity_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
