@@ -1,3 +1,4 @@
+from django.db import models
 import uuid
 from rest_framework import permissions, viewsets, serializers
 
@@ -38,6 +39,28 @@ class BookingSerializer(serializers.ModelSerializer):
         validated_data["key"] = uuid.uuid4()
         validated_data["owner"] = self.context["request"].user
         return super().create(validated_data)
+
+    def validate_applicants(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Applicants must be a positive integer.")
+        # TODO: Extract into services.
+        confirmed_applicants = (
+            (
+                Booking.objects.filter(
+                    status="CONFIRMED",
+                    starts_at__gte=self.initial_data["starts_at"],
+                    ends_at__lt=self.initial_data["ends_at"],
+                ).aggregate(total_applicants=models.Sum("applicants"))[
+                    "total_applicants"
+                ]
+            )
+            or 0
+        )
+        if value > 50_000 - confirmed_applicants:
+            raise serializers.ValidationError(
+                "Applicants must be under booking capacity per slot."
+            )
+        return value
 
 
 class BookingViewSet(viewsets.ModelViewSet):
