@@ -49,6 +49,7 @@ class BookingSerializer(serializers.ModelSerializer):
             (
                 Booking.objects.filter(
                     status="CONFIRMED",
+                    owner=self.context["request"].user,
                     starts_at__gte=self.initial_data["starts_at"],
                     ends_at__lt=self.initial_data["ends_at"],
                 ).aggregate(total_applicants=models.Sum("applicants"))[
