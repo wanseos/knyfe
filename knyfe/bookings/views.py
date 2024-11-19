@@ -1,43 +1,58 @@
-from rest_framework import permissions, viewsets, response, serializers
-from django.shortcuts import get_object_or_404
+import uuid
+from rest_framework import permissions, viewsets, serializers
 
 from bookings.models import Booking
 
 
-class BookingSerializer(serializers.Serializer):
-    key = serializers.UUIDField()
-    starts_at = serializers.DateTimeField()
-    ends_at = serializers.DateTimeField()
-    applicants = serializers.IntegerField()
+class IsAdminUserOrOwner(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        if request.user.is_staff:
+            return True
+        if "status" in request.data:
+            return False
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        if request.user.is_staff:
+            return True
+        return obj.owner == request.user
 
 
-class BookingViewSet(viewsets.ViewSet):
-    permission_classes = [permissions.IsAuthenticated]
+class BookingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Booking
+        fields = ["key", "starts_at", "ends_at", "applicants", "status"]
+        read_only_fields = ["key"]
+        extra_kwargs = {
+            "status": {"read_only": True},
+        }
 
-    def list(self, request):
-        # TODO: Extract into services.
-        qs = Booking.objects.all().only("key", "starts_at", "ends_at", "applicants")
-        if not request.user.is_staff:
-            qs = qs.filter(owner=request.user)
-        serializer = BookingSerializer(qs, many=True)
-        return response.Response(serializer.data)
+    def create(self, validated_data):
+        validated_data["key"] = uuid.uuid4()
+        validated_data["owner"] = self.context["request"].user
+        return super().create(validated_data)
 
-    def create(self, request):
-        pass
 
-    def retrieve(self, request, pk=None):
-        qs = Booking.objects.all().only("key", "starts_at", "ends_at", "applicants")
-        if not request.user.is_staff:
-            qs = qs.filter(owner=request.user)
-        obj = get_object_or_404(qs, key=pk)
-        serializer = BookingSerializer(obj)
-        return response.Response(serializer.data)
+class BookingViewSet(viewsets.ModelViewSet):
+    queryset = Booking.objects.all()
+    lookup_field = "key"
+    serializer_class = BookingSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminUserOrOwner]
 
-    def update(self, request, pk=None):
-        pass
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if not self.request.user.is_staff:
+            qs = qs.filter(owner=self.request.user)
+        return qs
 
-    def partial_update(self, request, pk=None):
-        pass
-
-    def destroy(self, request, pk=None):
-        pass
+    def perform_update(self, serializer):
+        if not self.request.user.is_staff:
+            if serializer.instance.status != "PENDING":
+                raise serializers.ValidationError("Cannot update confirmed booking.")
+            if "status" in serializer.validated_data:
+                raise serializers.ValidationError("Cannot update status.")
+        super().perform_update(serializer)
