@@ -23,6 +23,9 @@ class IsAdminUserOrOwner(permissions.BasePermission):
 
 
 class BookingSerializer(serializers.ModelSerializer):
+    # TODO: Implement value validation. e.g. starts_at < ends_at
+    # positive integer for applicants
+    # applicants under booking_capacity_per_slot
     class Meta:
         model = Booking
         fields = ["key", "starts_at", "ends_at", "applicants", "status"]
@@ -56,3 +59,10 @@ class BookingViewSet(viewsets.ModelViewSet):
             if "status" in serializer.validated_data:
                 raise serializers.ValidationError("Cannot update status.")
         super().perform_update(serializer)
+
+    def perform_destroy(self, instance):
+        if not self.request.user.is_staff:
+            # TODO: Extract into services.
+            if instance.status != "PENDING":
+                raise serializers.ValidationError("Cannot delete confirmed booking.")
+        return super().perform_destroy(instance)
