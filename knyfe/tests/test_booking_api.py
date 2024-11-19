@@ -84,6 +84,17 @@ class BookingTests(APITestCase):
         response = self.client.post(BASE_URL, {})
         self.assertEqual(response.status_code, 403)
 
+    def test_create_invalid_booking_by_non_admin(self):
+        self.client.login(username="nonadmin1", password="password")
+        data = {
+            "starts_at": "2022-01-01T00:00:00Z",
+            "ends_at": "2022-01-01T01:00:00Z",
+            "applicants": 1,
+            "status": "APPROVED",
+        }
+        response = self.client.post(BASE_URL, data)
+        self.assertEqual(response.status_code, 403)
+
     def test_create_booking_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
         data = {
