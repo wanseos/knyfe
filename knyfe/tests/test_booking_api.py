@@ -26,19 +26,20 @@ class BookingTests(APITestCase):
             username="nonadmin2",
             password="password",
         )
-        cls.booking = Booking.objects.create(
+        cls.pending_booking = Booking.objects.create(
             key=uuid.uuid4(),
             starts_at="2022-01-01T00:00:00Z",
             ends_at="2022-01-01T01:00:00Z",
             applicants=1,
             owner=cls.non_admin_user1,
         )
-        Booking.objects.create(
+        cls.confirmed_booking = Booking.objects.create(
             key=uuid.uuid4(),
             starts_at="2022-01-01T00:00:00Z",
             ends_at="2022-01-01T01:00:00Z",
             applicants=1,
             owner=cls.non_admin_user2,
+            status="APPROVED",
         )
 
     def test_list_bookings_by_non_logged_in(self):
@@ -63,18 +64,89 @@ class BookingTests(APITestCase):
 
     def test_retrieve_booking_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
-        booking_key = self.booking.key
+        booking_key = self.pending_booking.key
         response = self.client.get(f"{BASE_URL}{booking_key}/")
         self.assertEqual(response.status_code, 200)
 
     def test_retrieve_booking_by_non_owner(self):
         self.client.login(username="nonadmin2", password="password")
-        booking_key = self.booking.key
+        booking_key = self.pending_booking.key
         response = self.client.get(f"{BASE_URL}{booking_key}/")
         self.assertEqual(response.status_code, 404)
 
     def test_retrieve_booking_by_admin(self):
         self.client.login(username="admin", password="password")
-        booking_key = self.booking.key
+        booking_key = self.pending_booking.key
         response = self.client.get(f"{BASE_URL}{booking_key}/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_create_booking_by_non_logged_in(self):
+        response = self.client.post(BASE_URL, {})
+        self.assertEqual(response.status_code, 403)
+
+    def test_create_booking_by_non_admin(self):
+        self.client.login(username="nonadmin1", password="password")
+        data = {
+            "starts_at": "2022-01-01T00:00:00Z",
+            "ends_at": "2022-01-01T01:00:00Z",
+            "applicants": 1,
+        }
+        response = self.client.post(BASE_URL, data)
+        self.assertEqual(response.status_code, 201)
+
+    def test_partial_update_pending_booking_by_non_owner(self):
+        self.client.login(username="nonadmin2", password="password")
+        key = self.pending_booking.key
+        response = self.client.patch(f"{BASE_URL}{key}/", {})
+        self.assertEqual(response.status_code, 404)
+
+    def test_partial_update_pending_booking_by_owner(self):
+        self.client.login(username="nonadmin1", password="password")
+        key = self.pending_booking.key
+        data = {
+            "starts_at": "2022-01-01T00:00:00Z",
+            "ends_at": "2022-01-01T01:00:00Z",
+            "applicants": 1,
+        }
+        response = self.client.patch(f"{BASE_URL}{key}/", data)
+        self.assertEqual(response.status_code, 200)
+
+    def test_partial_update_confirmed_booking_by_non_owner(self):
+        self.client.login(username="nonadmin1", password="password")
+        key = self.confirmed_booking.key
+        data = {
+            "starts_at": "2022-01-01T00:00:00Z",
+            "ends_at": "2022-01-01T01:00:00Z",
+            "applicants": 1,
+        }
+        response = self.client.patch(f"{BASE_URL}{key}/", data=data)
+        self.assertEqual(response.status_code, 404)
+
+    def test_partial_update_confirmed_booking_by_owner(self):
+        self.client.login(username="nonadmin2", password="password")
+        key = self.confirmed_booking.key
+        data = {
+            "starts_at": "2022-01-01T00:00:00Z",
+            "ends_at": "2022-01-01T01:00:00Z",
+            "applicants": 1,
+        }
+        response = self.client.patch(f"{BASE_URL}{key}/", data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_partial_update_pending_booking_status_by_owner(self):
+        self.client.login(username="nonadmin1", password="password")
+        key = self.pending_booking.key
+        data = {
+            "status": "APPROVED",
+        }
+        response = self.client.patch(f"{BASE_URL}{key}/", data)
+        self.assertEqual(response.status_code, 403)
+
+    def test_partial_update_pending_booking_status_by_admin(self):
+        self.client.login(username="admin", password="password")
+        key = self.pending_booking.key
+        data = {
+            "status": "APPROVED",
+        }
+        response = self.client.patch(f"{BASE_URL}{key}/", data)
         self.assertEqual(response.status_code, 200)
