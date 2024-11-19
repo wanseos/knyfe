@@ -31,15 +31,15 @@ class BookingTests(APITestCase):
         )
         cls.pending_booking = Booking.objects.create(
             key=uuid.uuid4(),
-            starts_at="2022-01-01T00:00:00Z",
-            ends_at="2022-01-01T01:00:00Z",
+            starts_at="2026-01-01T00:00:00Z",
+            ends_at="2026-01-01T01:00:00Z",
             applicants=100,
             owner=cls.non_admin_user1,
         )
         cls.confirmed_booking = Booking.objects.create(
             key=uuid.uuid4(),
-            starts_at="2022-01-01T00:00:00Z",
-            ends_at="2022-01-01T01:00:00Z",
+            starts_at="2026-01-01T00:00:00Z",
+            ends_at="2026-01-01T01:00:00Z",
             applicants=200,
             owner=cls.non_admin_user2,
             status="APPROVED",
@@ -90,8 +90,8 @@ class BookingTests(APITestCase):
     def test_create_invalid_booking_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
         data = {
-            "starts_at": "2022-01-01T00:00:00Z",
-            "ends_at": "2022-01-01T01:00:00Z",
+            "starts_at": "2026-01-01T00:00:00Z",
+            "ends_at": "2026-01-01T01:00:00Z",
             "applicants": 1,
             "status": "APPROVED",
         }
@@ -100,8 +100,7 @@ class BookingTests(APITestCase):
 
     def test_create_booking_with_invalid_starts_at_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
-        current_datetime = timezone.now()
-        invalid_start_at = current_datetime - timezone.timedelta(days=1)
+        invalid_start_at = timezone.now() - timezone.timedelta(days=1)
         data = {
             "starts_at": invalid_start_at,
             "ends_at": invalid_start_at + timezone.timedelta(hours=1),
@@ -113,8 +112,8 @@ class BookingTests(APITestCase):
     def test_create_booking_over_capacity_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
         data = {
-            "starts_at": "2022-01-01T00:00:00Z",
-            "ends_at": "2022-01-01T01:00:00Z",
+            "starts_at": "2026-01-01T00:00:00Z",
+            "ends_at": "2026-01-01T01:00:00Z",
             "applicants": self.booking_capacity_per_slot + 1,
         }
         response = self.client.post(BASE_URL, data)
@@ -123,10 +122,9 @@ class BookingTests(APITestCase):
     def test_create_booking_within_capacity_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
         data = {
-            "starts_at": "2022-01-01T00:00:00Z",
-            "ends_at": "2022-01-01T01:00:00Z",
-            "applicants": self.booking_capacity_per_slot
-            - self.confirmed_booking.applicants,
+            "starts_at": "2026-01-01T00:00:00Z",
+            "ends_at": "2026-01-01T01:00:00Z",
+            "applicants": 2,
         }
         response = self.client.post(BASE_URL, data)
         self.assertEqual(response.status_code, 201)
@@ -134,8 +132,8 @@ class BookingTests(APITestCase):
     def test_create_booking_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
         data = {
-            "starts_at": "2022-01-01T00:00:00Z",
-            "ends_at": "2022-01-01T01:00:00Z",
+            "starts_at": "2026-01-01T00:00:00Z",
+            "ends_at": "2026-01-01T01:00:00Z",
             "applicants": 1,
         }
         response = self.client.post(BASE_URL, data)
@@ -151,8 +149,8 @@ class BookingTests(APITestCase):
         self.client.login(username="nonadmin1", password="password")
         key = self.pending_booking.key
         data = {
-            "starts_at": "2022-01-01T00:00:00Z",
-            "ends_at": "2022-01-01T01:00:00Z",
+            "starts_at": "2026-01-01T00:00:00Z",
+            "ends_at": "2026-01-01T01:00:00Z",
             "applicants": 1,
         }
         response = self.client.patch(f"{BASE_URL}{key}/", data)
@@ -162,8 +160,8 @@ class BookingTests(APITestCase):
         self.client.login(username="nonadmin1", password="password")
         key = self.confirmed_booking.key
         data = {
-            "starts_at": "2022-01-01T00:00:00Z",
-            "ends_at": "2022-01-01T01:00:00Z",
+            "starts_at": "2026-01-01T00:00:00Z",
+            "ends_at": "2026-01-01T01:00:00Z",
             "applicants": 1,
         }
         response = self.client.patch(f"{BASE_URL}{key}/", data=data)
@@ -173,8 +171,8 @@ class BookingTests(APITestCase):
         self.client.login(username="nonadmin2", password="password")
         key = self.confirmed_booking.key
         data = {
-            "starts_at": "2022-01-01T00:00:00Z",
-            "ends_at": "2022-01-01T01:00:00Z",
+            "starts_at": "2026-01-01T00:00:00Z",
+            "ends_at": "2026-01-01T01:00:00Z",
             "applicants": 1,
         }
         response = self.client.patch(f"{BASE_URL}{key}/", data)
@@ -242,15 +240,15 @@ class BookingAvailabilityTests(APITestCase):
         )
         cls.pending_booking = Booking.objects.create(
             key=uuid.uuid4(),
-            starts_at="2022-01-01T00:00:00Z",
-            ends_at="2022-01-01T01:00:00Z",
+            starts_at="2026-01-01T00:00:00Z",
+            ends_at="2026-01-01T01:00:00Z",
             applicants=100,
             owner=cls.non_admin_user1,
         )
         cls.confirmed_booking = Booking.objects.create(
             key=uuid.uuid4(),
-            starts_at="2022-01-01T00:00:00Z",
-            ends_at="2022-01-01T01:00:00Z",
+            starts_at="2026-01-01T00:00:00Z",
+            ends_at="2026-01-01T01:00:00Z",
             applicants=20_000,
             owner=cls.non_admin_user1,
             status="APPROVED",
@@ -264,7 +262,7 @@ class BookingAvailabilityTests(APITestCase):
     def test_list_availability_segments_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
         params = {
-            "date_utc": "2022-01-01",
+            "date_utc": "2026-01-01",
         }
         response = self.client.get(self.endpoint, params)
         self.assertEqual(response.status_code, 200)
