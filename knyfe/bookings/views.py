@@ -1,3 +1,4 @@
+from django.utils import timezone
 from django.db import models
 import uuid
 from rest_framework import permissions, viewsets, serializers
@@ -59,6 +60,13 @@ class BookingSerializer(serializers.ModelSerializer):
         if value > 50_000 - confirmed_applicants:
             raise serializers.ValidationError(
                 "Applicants must be under booking capacity per slot."
+            )
+        return value
+
+    def validate_starts_at(self, value):
+        if value < timezone.now() + timezone.timedelta(days=3):
+            raise serializers.ValidationError(
+                "Booking must be made at least 3 days in advance."
             )
         return value
 
