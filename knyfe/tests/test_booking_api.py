@@ -10,6 +10,8 @@ BASE_URL = "http://localhost:8000/api/bookings/"
 class BookingTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
+        # TODO: Extract into enums or callables.
+        cls.booking_capacity_per_slot = 50_000
         # TODO: Extract into fixtures.
         User = get_user_model()
         cls.admin_user = User.objects.create_user(
@@ -30,14 +32,14 @@ class BookingTests(APITestCase):
             key=uuid.uuid4(),
             starts_at="2022-01-01T00:00:00Z",
             ends_at="2022-01-01T01:00:00Z",
-            applicants=1,
+            applicants=100,
             owner=cls.non_admin_user1,
         )
         cls.confirmed_booking = Booking.objects.create(
             key=uuid.uuid4(),
             starts_at="2022-01-01T00:00:00Z",
             ends_at="2022-01-01T01:00:00Z",
-            applicants=1,
+            applicants=200,
             owner=cls.non_admin_user2,
             status="APPROVED",
         )
@@ -94,6 +96,27 @@ class BookingTests(APITestCase):
         }
         response = self.client.post(BASE_URL, data)
         self.assertEqual(response.status_code, 403)
+
+    def test_create_booking_over_capacity_by_non_admin(self):
+        self.client.login(username="nonadmin1", password="password")
+        data = {
+            "starts_at": "2022-01-01T00:00:00Z",
+            "ends_at": "2022-01-01T01:00:00Z",
+            "applicants": self.booking_capacity_per_slot + 1,
+        }
+        response = self.client.post(BASE_URL, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_booking_within_capacity_by_non_admin(self):
+        self.client.login(username="nonadmin1", password="password")
+        data = {
+            "starts_at": "2022-01-01T00:00:00Z",
+            "ends_at": "2022-01-01T01:00:00Z",
+            "applicants": self.booking_capacity_per_slot
+            - self.confirmed_booking.applicants,
+        }
+        response = self.client.post(BASE_URL, data)
+        self.assertEqual(response.status_code, 201)
 
     def test_create_booking_by_non_admin(self):
         self.client.login(username="nonadmin1", password="password")
