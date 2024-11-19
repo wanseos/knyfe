@@ -22,6 +22,11 @@ from bookings import views
 
 router = routers.DefaultRouter()
 router.register(r"bookings", views.BookingViewSet, basename="bookings")
+router.register(
+    r"availability/segments",
+    views.BookingAvailabilityListAPIView,
+    basename="availability",
+)
 urlpatterns = [
     path("api/", include(router.urls)),
 ]
