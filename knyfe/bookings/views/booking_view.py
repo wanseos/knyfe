@@ -2,27 +2,10 @@ import uuid
 
 from django.db import models
 from django.utils import timezone
-from rest_framework import permissions, serializers, viewsets
+from rest_framework import permissions, response, serializers, viewsets
+from rest_framework.decorators import action
 
 from bookings.models import Booking
-
-
-class IsAdminUserOrOwner(permissions.BasePermission):
-    def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        if request.user.is_staff:
-            return True
-        if "status" in request.data:
-            return False
-        return True
-
-    def has_object_permission(self, request, view, obj):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        if request.user.is_staff:
-            return True
-        return obj.owner == request.user
 
 
 class BookingSerializer(serializers.ModelSerializer):
@@ -31,11 +14,15 @@ class BookingSerializer(serializers.ModelSerializer):
     # applicants under booking_capacity_per_slot
     class Meta:
         model = Booking
-        fields = ["key", "starts_at", "ends_at", "applicants", "status"]
-        read_only_fields = ["key"]
-        extra_kwargs = {
-            "status": {"read_only": True},
-        }
+        fields = [
+            "key",
+            "starts_at",
+            "ends_at",
+            "applicants",
+            "status",
+            "owner",
+        ]
+        read_only_fields = ["key", "status", "owner"]
 
     def create(self, validated_data):
         validated_data["key"] = uuid.uuid4()
@@ -77,7 +64,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     queryset = Booking.objects.all()
     lookup_field = "key"
     serializer_class = BookingSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminUserOrOwner]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -99,3 +86,13 @@ class BookingViewSet(viewsets.ModelViewSet):
             if instance.status != "PENDING":
                 raise serializers.ValidationError("Cannot delete confirmed booking.")
         return super().perform_destroy(instance)
+
+    @action(
+        detail=True, methods=["PATCH"], permission_classes=[permissions.IsAdminUser]
+    )
+    def approve(self, request, key):
+        booking = self.get_object()
+        if booking.status != "PENDING":
+            raise serializers.ValidationError("Cannot approve confirmed booking.")
+        booking.status = "APPROVED"
+        return response.Response(BookingSerializer(booking).data)
