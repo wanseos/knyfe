@@ -1,9 +1,9 @@
-from django.utils import timezone
 import uuid
-from rest_framework.test import APITestCase
 
-from django.contrib.auth import get_user_model
 from bookings.models import Booking
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from rest_framework.test import APITestCase
 
 BASE_URL = "http://localhost:8000/api/bookings/"
 

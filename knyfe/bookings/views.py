@@ -1,7 +1,8 @@
-from django.utils import timezone
-from django.db import models
 import uuid
-from rest_framework import permissions, viewsets, serializers, views
+
+from django.db import models
+from django.utils import timezone
+from rest_framework import permissions, serializers, views, viewsets
 
 from bookings.models import Booking
 
