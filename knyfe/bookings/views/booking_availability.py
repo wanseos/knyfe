@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -16,6 +17,11 @@ class DataSerializer(serializers.Serializer):
     remaining = serializers.IntegerField()
 
 
+@extend_schema(
+    description="List available capacity per hour for a given date.",
+    parameters=[ParameterSerializer],
+    responses={200: DataSerializer(many=True)},
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list(request: Request) -> Response:
