@@ -1,18 +1,20 @@
 from bookings import views as bookings_views
+from bookings.views import booking_availability_views
 from django.urls import include, path
 from drf_spectacular import views as spectacular_views
 from rest_framework import routers
 
 router = routers.DefaultRouter()
 router.register(r"bookings", bookings_views.BookingViewSet, basename="bookings")
-router.register(
-    r"availability/segments",
-    bookings_views.BookingAvailabilityListAPIView,
-    basename="availability",
-)
+
 urlpatterns = [
     # api
     path("api/", include(router.urls)),
+    path(
+        "api/availability/segments/",
+        booking_availability_views.list,
+        name="availability",
+    ),
     # schema
     path("schema/", spectacular_views.SpectacularAPIView.as_view(), name="schema"),
     path(
