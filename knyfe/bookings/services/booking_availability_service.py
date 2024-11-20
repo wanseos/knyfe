@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 import typing
 
@@ -7,25 +8,38 @@ from django.utils import timezone
 from ..models import Booking
 
 
+def get_booking_capacity() -> int:
+    return 50_000
+
+
+@dataclasses.dataclass
+class BookingAvailability:
+    index: int
+    remaining: int
+
+
 def query_availabilities(
-    date: datetime.date, user
-) -> typing.List[typing.Dict[str, typing.Union[int, str]]]:
+    date: datetime.date,
+    user_id: int,
+) -> typing.List[BookingAvailability]:
     segments = []
     starts_at = timezone.datetime.combine(
         date, timezone.datetime.min.time(), timezone.utc
+    )
+    qs = Booking.objects.filter(
+        status=Booking.Status.APPROVED,
+        owner_id=user_id,
     )
     for h in range(24):
         new_st = starts_at + timezone.timedelta(hours=h)
         new_et = starts_at + timezone.timedelta(hours=h + 1)
         confirmed_applicants = (
             (
-                Booking.objects.filter(
+                qs.filter(
                     models.Q(
                         models.Q(starts_at__range=(new_st, new_et))
                         | models.Q(ends_at__range=(new_st, new_et))
-                    ),
-                    status="APPROVED",
-                    owner=user,
+                    )
                 ).aggregate(total_applicants=models.Sum("applicants"))[
                     "total_applicants"
                 ]
@@ -33,9 +47,9 @@ def query_availabilities(
             or 0
         )
         segments.append(
-            {
-                "index": h,
-                "remaining": 50_000 - confirmed_applicants,
-            }
+            BookingAvailability(
+                index=h,
+                remaining=get_booking_capacity() - confirmed_applicants,
+            )
         )
     return segments
