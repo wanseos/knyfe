@@ -2,10 +2,9 @@ import dataclasses
 import datetime
 import typing
 
-from django.db import models
+from django.db import connection
 from django.utils import timezone
 
-from ..models import Booking
 from . import booking_service
 
 
@@ -19,34 +18,46 @@ def query_availabilities(
     date: datetime.date,
     user_id: int,
 ) -> typing.List[BookingAvailability]:
-    segments = []
     starts_at = timezone.datetime.combine(
         date, timezone.datetime.min.time(), timezone.utc
     )
-    qs = Booking.objects.filter(
-        status=Booking.Status.APPROVED,
-        owner_id=user_id,
-    )
-    for h in range(24):
-        new_st = starts_at + timezone.timedelta(hours=h)
-        new_et = starts_at + timezone.timedelta(hours=h + 1)
-        confirmed_applicants = (
-            (
-                qs.filter(
-                    models.Q(
-                        models.Q(starts_at__range=(new_st, new_et))
-                        | models.Q(ends_at__range=(new_st, new_et))
-                    )
-                ).aggregate(total_applicants=models.Sum("applicants"))[
-                    "total_applicants"
-                ]
-            )
-            or 0
+    query = """
+WITH intervals AS (
+    SELECT
+        generate_series(
+            %s::timestamptz,
+            %s::timestamptz,
+            '1 hour'
+        ) AS start_time
+),
+bookings_with_intervals AS (
+    SELECT
+        i.start_time,
+        i.start_time + interval '1 hour' AS end_time,
+        COALESCE(b.applicants, 0) AS applicants
+    FROM intervals i
+    LEFT JOIN bookings_booking b
+    ON b.owner_id = %s
+       AND b.status = 'APPROVED'
+       AND (
+           b.starts_at BETWEEN i.start_time AND i.start_time + interval '1 hour' OR
+           b.ends_at BETWEEN i.start_time AND i.start_time + interval '1 hour'
+       )
+)
+SELECT
+    EXTRACT(HOUR FROM start_time)::INT AS hour_index,
+    SUM(applicants) AS total_applicants
+FROM bookings_with_intervals
+GROUP BY hour_index
+ORDER BY hour_index;
+"""
+    params = [starts_at, starts_at + timezone.timedelta(hours=23), user_id]
+    with connection.cursor() as cursor:
+        cursor.execute(query, params)
+        data = cursor.fetchall()
+    return [
+        BookingAvailability(
+            index=row[0], remaining=booking_service.get_booking_capacity() - row[1]
         )
-        segments.append(
-            BookingAvailability(
-                index=h,
-                remaining=booking_service.get_booking_capacity() - confirmed_applicants,
-            )
-        )
-    return segments
+        for row in data
+    ]
