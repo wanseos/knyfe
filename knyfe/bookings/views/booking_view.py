@@ -1,5 +1,3 @@
-import uuid
-
 from django.db import models
 from django.utils import timezone
 from rest_framework import permissions, response, serializers, viewsets
@@ -7,11 +5,10 @@ from rest_framework.decorators import action
 
 from bookings.models import Booking
 
+from ..services import booking_service
+
 
 class BookingSerializer(serializers.ModelSerializer):
-    # TODO: Implement value validation. e.g. starts_at < ends_at
-    # positive integer for applicants
-    # applicants under booking_capacity_per_slot
     class Meta:
         model = Booking
         fields = [
@@ -25,14 +22,13 @@ class BookingSerializer(serializers.ModelSerializer):
         read_only_fields = ["key", "status", "owner"]
 
     def create(self, validated_data):
-        validated_data["key"] = uuid.uuid4()
+        validated_data["key"] = booking_service.generate_key()
         validated_data["owner"] = self.context["request"].user
         return super().create(validated_data)
 
     def validate_applicants(self, value):
         if value <= 0:
             raise serializers.ValidationError("Applicants must be a positive integer.")
-        # TODO: Extract into services.
         confirmed_applicants = (
             (
                 Booking.objects.filter(
@@ -46,7 +42,7 @@ class BookingSerializer(serializers.ModelSerializer):
             )
             or 0
         )
-        if value > 50_000 - confirmed_applicants:
+        if value > booking_service.get_booking_capacity() - confirmed_applicants:
             raise serializers.ValidationError(
                 "Applicants must be under booking capacity per slot."
             )
@@ -74,25 +70,26 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         if not self.request.user.is_staff:
-            if serializer.instance.status != "PENDING":
+            obj = self.get_object()
+            if obj.status != Booking.Status.PENDING:
                 raise serializers.ValidationError("Cannot update confirmed booking.")
-            if "status" in serializer.validated_data:
-                raise serializers.ValidationError("Cannot update status.")
         super().perform_update(serializer)
 
     def perform_destroy(self, instance):
         if not self.request.user.is_staff:
-            # TODO: Extract into services.
-            if instance.status != "PENDING":
+            if instance.status != Booking.Status.PENDING:
                 raise serializers.ValidationError("Cannot delete confirmed booking.")
         return super().perform_destroy(instance)
 
     @action(
-        detail=True, methods=["PATCH"], permission_classes=[permissions.IsAdminUser]
+        detail=True,
+        methods=["PATCH"],
+        permission_classes=[permissions.IsAdminUser],
     )
     def approve(self, request, key):
-        booking = self.get_object()
-        if booking.status != "PENDING":
+        obj = self.get_object()
+        if obj.status != Booking.Status.PENDING:
             raise serializers.ValidationError("Cannot approve confirmed booking.")
-        booking.status = "APPROVED"
-        return response.Response(BookingSerializer(booking).data)
+        obj.status = "APPROVED"
+        obj.save()
+        return response.Response(BookingSerializer(obj).data)

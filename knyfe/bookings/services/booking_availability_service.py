@@ -6,10 +6,7 @@ from django.db import models
 from django.utils import timezone
 
 from ..models import Booking
-
-
-def get_booking_capacity() -> int:
-    return 50_000
+from . import booking_service
 
 
 @dataclasses.dataclass
@@ -49,7 +46,7 @@ def query_availabilities(
         segments.append(
             BookingAvailability(
                 index=h,
-                remaining=get_booking_capacity() - confirmed_applicants,
+                remaining=booking_service.get_booking_capacity() - confirmed_applicants,
             )
         )
     return segments
