@@ -1,4 +1,3 @@
-from django.db import models
 from django.utils import timezone
 from rest_framework import permissions, response, serializers, viewsets
 from rest_framework.decorators import action
@@ -29,20 +28,12 @@ class BookingSerializer(serializers.ModelSerializer):
     def validate_applicants(self, value):
         if value <= 0:
             raise serializers.ValidationError("Applicants must be a positive integer.")
-        confirmed_applicants = (
-            (
-                Booking.objects.filter(
-                    status="CONFIRMED",
-                    owner=self.context["request"].user,
-                    starts_at__gte=self.initial_data["starts_at"],
-                    ends_at__lt=self.initial_data["ends_at"],
-                ).aggregate(total_applicants=models.Sum("applicants"))[
-                    "total_applicants"
-                ]
-            )
-            or 0
-        )
-        if value > booking_service.get_booking_capacity() - confirmed_applicants:
+        if booking_service.exceeds_capacity(
+            self.initial_data["starts_at"],
+            self.initial_data["ends_at"],
+            self.context["request"].user.id,
+            value,
+        ):
             raise serializers.ValidationError(
                 "Applicants must be under booking capacity per slot."
             )
