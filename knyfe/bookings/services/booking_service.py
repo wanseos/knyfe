@@ -2,6 +2,7 @@ import datetime
 import uuid
 
 from django.db import models
+from django.utils import timezone
 
 from ..models import Booking
 
@@ -32,3 +33,7 @@ def exceeds_capacity(
         or 0
     )
     return applicants > get_booking_capacity() - confirmed_applicants
+
+
+def passed_booking_deadline(starts_at: datetime.datetime) -> bool:
+    return starts_at < timezone.now() + timezone.timedelta(days=3)

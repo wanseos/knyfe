@@ -1,4 +1,3 @@
-from django.utils import timezone
 from rest_framework import permissions, response, serializers, viewsets
 from rest_framework.decorators import action
 
@@ -40,7 +39,7 @@ class BookingSerializer(serializers.ModelSerializer):
         return value
 
     def validate_starts_at(self, value):
-        if value < timezone.now() + timezone.timedelta(days=3):
+        if booking_service.passed_booking_deadline(value):
             raise serializers.ValidationError(
                 "Booking must be made at least 3 days in advance."
             )
@@ -81,6 +80,6 @@ class BookingViewSet(viewsets.ModelViewSet):
         obj = self.get_object()
         if obj.status != Booking.Status.PENDING:
             raise serializers.ValidationError("Cannot approve confirmed booking.")
-        obj.status = "APPROVED"
+        obj.status = Booking.Status.APPROVED
         obj.save()
         return response.Response(BookingSerializer(obj).data)
