@@ -48,3 +48,11 @@ class BookingAvailabilityTests(APITestCase):
         response = self.client.get(self.endpoint, params)
         self.assertEqual(response.status_code, 200)
         self.assertTrue({"index": 0, "remaining": 30_000} in response.data)
+
+    def test_list_availability_segments_performance(self):
+        self.client.login(username="nonadmin1", password="password")
+        with self.assertNumQueries(3):
+            params = {
+                "date_utc": "2026-01-01",
+            }
+            self.client.get(self.endpoint, params)
