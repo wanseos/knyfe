@@ -1,7 +1,6 @@
-from . import booking_availability_view
-from .booking_view import BookingViewSet
+from . import booking_availability_view, booking_view
 
 __all__ = [
-    "BookingViewSet",
+    "booking_view",
     "booking_availability_view",
 ]
