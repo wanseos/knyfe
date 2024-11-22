@@ -1,14 +1,22 @@
 import datetime
+import uuid
 
 from django.db import models
 from django.utils import timezone
 
 from ..models import BookingEvent, BookingProjection
-from . import booking_service
+
+
+def generate_key() -> uuid.UUID:
+    return uuid.uuid4()
 
 
 def get_booking_capacity() -> int:
     return 50_000
+
+
+def passed_booking_deadline(starts_at: datetime.datetime) -> bool:
+    return starts_at < timezone.now() + timezone.timedelta(days=3)
 
 
 def handle_create_booking(user_id, data: dict):
@@ -16,7 +24,7 @@ def handle_create_booking(user_id, data: dict):
         user_id=user_id,
         timestamp=timezone.now(),
         # booking_key=booking_key,
-        booking_key=booking_service.generate_key(),
+        booking_key=generate_key(),
         event_type=BookingEvent.EventType.CREATED,
         data=data,
     )

@@ -5,7 +5,7 @@ import typing
 from django.db import connection
 from django.utils import timezone
 
-from . import booking_service
+from . import booking_event_service
 
 
 @dataclasses.dataclass
@@ -57,7 +57,8 @@ ORDER BY hour_index;
         data = cursor.fetchall()
     return [
         BookingAvailability(
-            index=row[0], remaining=booking_service.get_booking_capacity() - row[1]
+            index=row[0],
+            remaining=booking_event_service.get_booking_capacity() - row[1],
         )
         for row in data
     ]

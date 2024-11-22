@@ -2,7 +2,7 @@ from rest_framework import permissions, response, serializers, status, viewsets
 from rest_framework.decorators import action
 
 from ..models import BookingProjection, User
-from ..services import booking_event_service, booking_service
+from ..services import booking_event_service
 
 
 class BookingSerializer(serializers.Serializer):
@@ -26,7 +26,7 @@ class BookingSerializer(serializers.Serializer):
         return value
 
     def validate_starts_at(self, value):
-        if booking_service.passed_booking_deadline(value):
+        if booking_event_service.passed_booking_deadline(value):
             raise serializers.ValidationError(
                 "Booking must be made at least 3 days in advance."
             )
