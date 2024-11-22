@@ -1,14 +1,14 @@
-from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from ..services import booking_event_service
+from ..models import User
+from ..services import booking_handler
 
 
 class BookingAvailabilityTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.endpoint = "http://localhost:8000/api/availability/segments/"
-        User = get_user_model()
         cls.admin_user = User.objects.create_user(
             username="admin",
             password="password",
@@ -23,31 +23,38 @@ class BookingAvailabilityTests(APITestCase):
             username="nonadmin2",
             password="password",
         )
-        pending_booking = booking_event_service.handle_booking_created_event(
-            user_id=cls.non_admin_user1.id,
+        # create pending booking
+        result = booking_handler.handle_create(
+            user=cls.non_admin_user1,
             data={
-                "owner_id": cls.non_admin_user1.id,
-                "starts_at": "2026-01-01T00:00:00Z",
-                "ends_at": "2026-01-01T01:00:00Z",
-                "applicants": 100,
+                "starts_at": timezone.datetime(
+                    2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc
+                ),
+                "ends_at": timezone.datetime(2026, 1, 1, 1, 0, 0, tzinfo=timezone.utc),
+                "applicants": 1,
             },
         )
-        cls.pending_booking_key = pending_booking.booking_key
-        approved_booking = booking_event_service.handle_booking_created_event(
-            user_id=cls.non_admin_user2.id,
+        assert result.is_ok()
+        cls.pending_booking_key = result.unwrap()["booking_key"]
+
+        # create and approve booking
+        result = booking_handler.handle_create(
+            user=cls.non_admin_user2,
             data={
-                "owner_id": cls.non_admin_user2.id,
-                "starts_at": "2026-01-01T00:00:00Z",
-                "ends_at": "2026-01-01T01:00:00Z",
+                "starts_at": timezone.datetime(
+                    2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc
+                ),
+                "ends_at": timezone.datetime(2026, 1, 1, 1, 0, 0, tzinfo=timezone.utc),
                 "applicants": 20_000,
             },
         )
-        approved_booking = booking_event_service.handle_booking_updated_event(
-            user_id=cls.admin_user.id,
-            booking_key=approved_booking.booking_key,
-            data={"status": "APPROVED"},
+        assert result.is_ok()
+        result = booking_handler.handle_approve(
+            user=cls.admin_user,
+            booking_key=result.unwrap()["booking_key"],
         )
-        cls.approved_booking_key = approved_booking.booking_key
+        assert result.is_ok()
+        cls.approved_booking_key = result.unwrap()["booking_key"]
 
     def test_list_availability_segments_by_non_logged_in(self):
         response = self.client.get(self.endpoint)
