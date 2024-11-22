@@ -1,7 +1,5 @@
-import datetime
 import uuid
 
-from django.db import models
 from django.utils import timezone
 
 from ..models import BookingEvent, BookingProjection
@@ -9,10 +7,6 @@ from ..models import BookingEvent, BookingProjection
 
 def generate_key() -> uuid.UUID:
     return uuid.uuid4()
-
-
-def passed_booking_deadline(starts_at: datetime.datetime) -> bool:
-    return starts_at < timezone.now() + timezone.timedelta(days=3)
 
 
 def handle_booking_created_event(user_id, data: dict) -> BookingProjection:
@@ -103,29 +97,3 @@ def _apply_updated_event(
 
 def _apply_deleted_event(booking_key):
     return BookingProjection.objects.filter(booking_key=booking_key).delete()
-
-
-def handle_list_bookings(user):
-    if user.is_staff:
-        return BookingProjection.objects.all()
-    return BookingProjection.objects.filter(owner=user)
-
-
-def booking_event_exceeds_capacity(
-    starts_at: datetime.datetime,
-    ends_at: datetime.datetime,
-    user_id: int,
-    applicants: int,
-) -> bool:
-    confirmed_applicants = (
-        (
-            BookingProjection.objects.filter(
-                status=BookingProjection.Status.APPROVED,
-                owner_id=user_id,
-                starts_at__gte=starts_at,
-                ends_at__lt=ends_at,
-            ).aggregate(total_applicants=models.Sum("applicants"))["total_applicants"]
-        )
-        or 0
-    )
-    return applicants > 50_000 - confirmed_applicants

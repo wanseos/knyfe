@@ -16,6 +16,16 @@ def query_by_booking_key(booking_key: uuid.UUID) -> BookingProjection:
     return BookingProjection.objects.get(booking_key=booking_key)
 
 
+def query_booking_projections_by_owner(owner_id: int):
+    if not owner_id:
+        return BookingProjection.objects.none()
+    return BookingProjection.objects.filter(owner_id=owner_id)
+
+
+def query_booking_projections():
+    return BookingProjection.objects.filter()
+
+
 def query_remaining_capacity(
     starts_at: datetime.datetime,
     ends_at: datetime.datetime,

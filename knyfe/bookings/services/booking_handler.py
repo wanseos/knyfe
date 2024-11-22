@@ -150,6 +150,12 @@ def handle_approve(user: User, booking_key: uuid.UUID) -> Result[BookingData, st
 
 
 def handle_list(user: User) -> typing.List[BookingData]:
+    if user.is_staff:
+        qs = booking_projection_service.query_booking_projections()
+    else:
+        qs = booking_projection_service.query_booking_projections_by_owner(
+            owner_id=user.pk
+        )
     return [
         {
             "booking_key": obj.booking_key,
@@ -158,7 +164,7 @@ def handle_list(user: User) -> typing.List[BookingData]:
             "applicants": obj.applicants,
             "status": obj.status,
         }
-        for obj in booking_event_service.handle_list_bookings(user)
+        for obj in qs
     ]
 
 
