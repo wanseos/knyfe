@@ -23,7 +23,7 @@ class BookingAvailabilityTests(APITestCase):
             username="nonadmin2",
             password="password",
         )
-        pending_booking = booking_event_service.handle_create_booking(
+        pending_booking = booking_event_service.handle_create(
             user_id=cls.non_admin_user1.id,
             data={
                 "owner_id": cls.non_admin_user1.id,
@@ -33,7 +33,7 @@ class BookingAvailabilityTests(APITestCase):
             },
         )
         cls.pending_booking_key = pending_booking.booking_key
-        approved_booking = booking_event_service.handle_create_booking(
+        approved_booking = booking_event_service.handle_create(
             user_id=cls.non_admin_user2.id,
             data={
                 "owner_id": cls.non_admin_user2.id,

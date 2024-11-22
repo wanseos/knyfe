@@ -19,23 +19,30 @@ def passed_booking_deadline(starts_at: datetime.datetime) -> bool:
     return starts_at < timezone.now() + timezone.timedelta(days=3)
 
 
-def handle_create_booking(user_id, data: dict):
-    event = BookingEvent.objects.create(
+def handle_create(user_id, data: dict) -> BookingProjection:
+    """create event and update projection"""
+    obj = BookingEvent(
         user_id=user_id,
         timestamp=timezone.now(),
-        # booking_key=booking_key,
         booking_key=generate_key(),
         event_type=BookingEvent.EventType.CREATED,
         data=data,
     )
-    return apply_event(event)
+    obj.save()
+    return _apply_created_event(
+        booking_key=obj.booking_key,
+        owner_id=obj.data["owner_id"],
+        starts_at=obj.data["starts_at"],
+        ends_at=obj.data["ends_at"],
+        applicants=obj.data["applicants"],
+    )
 
 
 def handle_update_booking(
     user_id,
     booking_key,
     data: dict,
-):
+) -> BookingProjection:
     event = BookingEvent.objects.create(
         user_id=user_id,
         timestamp=timezone.now(),
@@ -43,13 +50,16 @@ def handle_update_booking(
         event_type=BookingEvent.EventType.UPDATED,
         data=data,
     )
-    return apply_event(event)
+    return _apply_updated_event(
+        booking_key=event.booking_key,
+        data=event.data,
+    )
 
 
 def handle_delete_booking(
     user_id,
     booking_key,
-):
+) -> tuple:
     event = BookingEvent.objects.create(
         user_id=user_id,
         timestamp=timezone.now(),
@@ -57,27 +67,7 @@ def handle_delete_booking(
         event_type=BookingEvent.EventType.DELETED,
         data={},
     )
-    return apply_event(event)
-
-
-def apply_event(event: BookingEvent):
-    if event.event_type == BookingEvent.EventType.CREATED:
-        return _apply_created_event(
-            booking_key=event.booking_key,
-            owner_id=event.data["owner_id"],
-            starts_at=event.data["starts_at"],
-            ends_at=event.data["ends_at"],
-            applicants=event.data["applicants"],
-            # status=event.data['status'],
-        )
-    if event.event_type == BookingEvent.EventType.UPDATED:
-        return _apply_updated_event(
-            booking_key=event.booking_key,
-            data=event.data,
-        )
-    if event.event_type == BookingEvent.EventType.DELETED:
-        return _apply_deleted_event(booking_key=event.booking_key)
-    raise ValueError(f"Unknown event type: {event.event_type}")
+    return _apply_deleted_event(booking_key=event.booking_key)
 
 
 def _apply_created_event(
@@ -86,7 +76,6 @@ def _apply_created_event(
     starts_at,
     ends_at,
     applicants,
-    # status,
 ):
     return BookingProjection.objects.create(
         booking_key=booking_key,

@@ -1,8 +1,9 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, response, serializers, status, viewsets
 from rest_framework.decorators import action
 
 from ..models import BookingProjection, User
-from ..services import booking_event_service
+from ..services import booking_event_handler, booking_event_service
 
 
 class BookingSerializer(serializers.Serializer):
@@ -32,29 +33,6 @@ class BookingSerializer(serializers.Serializer):
             )
         return value
 
-    def create(self, validated_data):
-        current_user = self.context["request"].user
-        if booking_event_service.booking_event_exceeds_capacity(
-            self.validated_data["starts_at"],
-            self.validated_data["ends_at"],
-            self.context["request"].user.id,
-            validated_data["applicants"],
-        ):
-            raise serializers.ValidationError(
-                "Applicants must be under booking capacity per slot."
-            )
-        obj = booking_event_service.handle_create_booking(
-            user_id=current_user.id,
-            data={
-                "owner_id": current_user.id,
-                "starts_at": validated_data["starts_at"].isoformat(),
-                "ends_at": validated_data["ends_at"].isoformat(),
-                "applicants": validated_data["applicants"],
-                # 'status': validated_data['status'],
-            },
-        )
-        return obj
-
     def update(self, instance, validated_data):
         current_user = self.context["request"].user
         if booking_event_service.booking_event_exceeds_capacity(
@@ -83,7 +61,6 @@ class BookingSerializer(serializers.Serializer):
 
 class BookingViewSet(viewsets.ViewSet):
     lookup_field = "key"
-    serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def list(self, request):
@@ -107,11 +84,34 @@ class BookingViewSet(viewsets.ViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        request=BookingSerializer,
+        responses={201: BookingSerializer},
+    )
     def create(self, request):
-        serializer = BookingSerializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return response.Response(serializer.data, status=status.HTTP_201_CREATED)
+        # TODO: Refactor and add schema documentation.
+        ser = BookingSerializer(data=request.data, context={"request": request})
+        ser.is_valid(raise_exception=True)
+        request_data = ser.validated_data
+        result = booking_event_handler.handle_create(
+            user=request.user,
+            data={
+                "starts_at": request_data["starts_at"],
+                "ends_at": request_data["ends_at"],
+                "applicants": request_data["applicants"],
+            },
+        )
+
+        if result.is_error():
+            status_code = result.get_metadata(
+                "status_code", status.HTTP_400_BAD_REQUEST
+            )
+            raise serializers.ValidationError(result.unwrap_error(), code=status_code)
+
+        return response.Response(
+            BookingSerializer(result.unwrap()).data,
+            status=result.get_metadata("status_code", status.HTTP_201_CREATED),
+        )
 
     def partial_update(self, request, key):
         try:
