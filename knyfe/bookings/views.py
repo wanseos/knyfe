@@ -1,229 +1,205 @@
 from drf_spectacular.utils import extend_schema
-from rest_framework import permissions, response, serializers, status, viewsets
+from rest_framework import (
+    permissions,
+    response,
+    serializers,
+    status,
+    viewsets,
+)
 from rest_framework.decorators import action, api_view, permission_classes
 
-from .models import BookingProjection, User
-from .services import booking_event_service, booking_handler
+from .models import BookingProjection
+from .services import booking_handler
 
 
 class BookingSerializer(serializers.Serializer):
-    booking_key = serializers.UUIDField(required=False)
-    status = serializers.ChoiceField(
-        choices=BookingProjection.Status.choices, required=False
-    )
-    owner = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), required=False
-    )
+    booking_key = serializers.UUIDField()
+    status = serializers.ChoiceField(choices=BookingProjection.Status.choices)
     starts_at = serializers.DateTimeField()
     ends_at = serializers.DateTimeField()
     applicants = serializers.IntegerField()
 
     class Meta:
-        read_only_fields = ["booking_key", "status", "owner"]
+        read_only_fields = ["booking_key", "status"]
 
-    def validate_applicants(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Applicants must be a positive integer.")
-        return value
 
-    def validate_starts_at(self, value):
-        if booking_event_service.passed_booking_deadline(value):
-            raise serializers.ValidationError(
-                "Booking must be made at least 3 days in advance."
-            )
-        return value
+class BookingCreateSerializer(serializers.Serializer):
+    starts_at = serializers.DateTimeField(required=True)
+    ends_at = serializers.DateTimeField(required=True)
+    applicants = serializers.IntegerField(required=True)
 
-    def update(self, instance, validated_data):
-        current_user = self.context["request"].user
-        if booking_event_service.booking_event_exceeds_capacity(
-            self.validated_data.get("starts_at", instance.starts_at),
-            self.validated_data.get("ends_at", instance.ends_at),
-            current_user.id,
-            validated_data.get("applicants", instance.applicants),
-        ):
-            raise serializers.ValidationError(
-                "Applicants must be under booking capacity per slot."
-            )
-        data = {}
-        if "starts_at" in validated_data:
-            data["starts_at"] = validated_data["starts_at"].isoformat()
-        if "ends_at" in validated_data:
-            data["ends_at"] = validated_data["ends_at"].isoformat()
-        if "applicants" in validated_data:
-            data["applicants"] = validated_data["applicants"]
-        obj = booking_event_service.handle_update_booking(
-            user_id=current_user.id,
-            booking_key=instance.booking_key,
-            data=data,
-        )
-        return obj
+
+class BookingUpdateSerializer(serializers.Serializer):
+    starts_at = serializers.DateTimeField(required=False)
+    ends_at = serializers.DateTimeField(required=False)
+    applicants = serializers.IntegerField(required=False)
 
 
 class BookingViewSet(viewsets.ViewSet):
-    lookup_field = "key"
+    lookup_field = "booking_key"
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(
+        responses={200: BookingSerializer(many=True)},
+    )
     def list(self, request):
-        # TODO: Refactor to use booking_handler.
-        current_user = request.user
-        qs = booking_event_service.handle_list_bookings(current_user)
+        data = booking_handler.handle_list(user=request.user)
         return response.Response(
-            BookingSerializer(qs, many=True).data, status=status.HTTP_200_OK
+            data=BookingSerializer(data, many=True).data,
+            status=status.HTTP_200_OK,
         )
 
-    def retrieve(self, request, key):
-        current_user = request.user
-        try:
-            obj = booking_event_service.handle_retrieve_booking(
-                user=current_user,
-                booking_key=key,
+    def retrieve(self, request, booking_key):
+        result = booking_handler.handle_retrieve(
+            user=request.user,
+            booking_key=booking_key,
+        )
+        if result.is_error():
+            return response.Response(
+                {"error": result.unwrap_error()},
+                status=result.get_metadata("status", status.HTTP_400_BAD_REQUEST),
             )
-        except BookingProjection.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
         return response.Response(
-            BookingSerializer(obj).data,
+            BookingSerializer(result.unwrap()).data,
             status=status.HTTP_200_OK,
         )
 
     @extend_schema(
-        request=BookingSerializer,
+        request=BookingCreateSerializer,
         responses={201: BookingSerializer},
     )
     def create(self, request):
-        # TODO: Refactor and add schema documentation.
-        ser = BookingSerializer(data=request.data, context={"request": request})
-        ser.is_valid(raise_exception=True)
-        request_data = ser.validated_data
+        request_serializer = BookingCreateSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        request_data = request_serializer.validated_data
         result = booking_handler.handle_create(
             user=request.user,
+            data=request_data,
+        )
+
+        if result.is_error():
+            return response.Response(
+                {"error": result.unwrap_error()},
+                status=result.get_metadata("status", status.HTTP_400_BAD_REQUEST),
+            )
+        return response.Response(
+            BookingSerializer(result.unwrap()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @extend_schema(
+        request=BookingUpdateSerializer,
+        responses={200: BookingSerializer},
+    )
+    def partial_update(self, request, booking_key):
+        request_serializer = BookingUpdateSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        request_data = request_serializer.validated_data
+        result = booking_handler.handle_update(
+            user=request.user,
+            booking_key=booking_key,
+            data=request_data,
+        )
+        if result.is_error():
+            return response.Response(
+                {"error": result.unwrap_error()},
+                status=result.get_metadata("status", status.HTTP_400_BAD_REQUEST),
+            )
+        return response.Response(
+            BookingSerializer(result.unwrap()).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        request=BookingUpdateSerializer,
+        responses={200: BookingSerializer},
+    )
+    def update(self, request, booking_key):
+        request_serializer = BookingUpdateSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        request_data = request_serializer.validated_data
+        result = booking_handler.handle_update(
+            user=request.user,
+            booking_key=booking_key,
             data={
                 "starts_at": request_data["starts_at"],
                 "ends_at": request_data["ends_at"],
                 "applicants": request_data["applicants"],
             },
         )
-
         if result.is_error():
-            status_code = result.get_metadata(
-                "status_code", status.HTTP_400_BAD_REQUEST
+            return response.Response(
+                {"error": result.unwrap_error()},
+                status=result.get_metadata("status", status.HTTP_400_BAD_REQUEST),
             )
-            raise serializers.ValidationError(result.unwrap_error(), code=status_code)
-
         return response.Response(
             BookingSerializer(result.unwrap()).data,
-            status=result.get_metadata("status_code", status.HTTP_201_CREATED),
+            status=status.HTTP_200_OK,
         )
 
-    def partial_update(self, request, key):
-        try:
-            obj = booking_event_service.handle_retrieve_booking(
-                user=request.user,
-                booking_key=key,
-            )
-        except BookingProjection.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-        if (
-            not request.user.is_staff
-            and obj.status == BookingProjection.Status.APPROVED
-        ):
-            return response.Response(
-                {"error": "Approved booking cannot be updated."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        serializer = BookingSerializer(
-            obj, data=request.data, context={"request": request}, partial=True
+    @extend_schema(
+        responses={204: None},
+    )
+    def destroy(self, request, booking_key):
+        result = booking_handler.handle_delete(
+            user=request.user,
+            booking_key=booking_key,
         )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return response.Response(serializer.data, status=status.HTTP_200_OK)
-
-    def update(self, request, key):
-        try:
-            obj = booking_event_service.handle_retrieve_booking(
-                user=request.user,
-                booking_key=key,
-            )
-        except BookingProjection.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-        if (
-            not request.user.is_staff
-            and obj.status == BookingProjection.Status.APPROVED
-        ):
+        if result.is_error():
             return response.Response(
-                {"error": "Approved booking cannot be updated."},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": result.unwrap_error()},
+                status=result.get_metadata("status", status.HTTP_400_BAD_REQUEST),
             )
-        serializer = BookingSerializer(
-            obj, data=request.data, context={"request": request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return response.Response(serializer.data, status=status.HTTP_200_OK)
-
-    def destroy(self, request, key):
-        try:
-            obj = booking_event_service.handle_retrieve_booking(
-                user=request.user,
-                booking_key=key,
-            )
-        except BookingProjection.DoesNotExist:
-            return response.Response(status=status.HTTP_404_NOT_FOUND)
-        if (
-            not request.user.is_staff
-            and obj.status == BookingProjection.Status.APPROVED
-        ):
-            return response.Response(
-                {"error": "Approved booking cannot be deleted."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        booking_event_service.handle_delete_booking(
-            user_id=request.user.id,
-            booking_key=key,
-        )
         return response.Response(status=status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(
+        responses={200: BookingSerializer},
+    )
     @action(
         detail=True,
         methods=["PATCH"],
         permission_classes=[permissions.IsAdminUser],
     )
-    def approve(self, request, key):
-        current_user = request.user
-        obj = booking_event_service.handle_update_booking(
-            user_id=current_user.id,
-            booking_key=key,
-            data={"status": BookingProjection.Status.APPROVED},
+    def approve(self, request, booking_key):
+        result = booking_handler.handle_approve(
+            user=request.user,
+            booking_key=booking_key,
         )
+        if result.is_error():
+            return response.Response(
+                {"error": result.unwrap_error()},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return response.Response(
-            BookingSerializer(obj).data,
+            BookingSerializer(result.unwrap()).data,
             status=status.HTTP_200_OK,
         )
 
 
-class ParameterSerializer(serializers.Serializer):
+class BookingAvailabilityRequestSerializer(serializers.Serializer):
     date_utc = serializers.DateField()
 
 
-class DataSerializer(serializers.Serializer):
+class BookingAvailabilitySerializer(serializers.Serializer):
     index = serializers.IntegerField()
     remaining = serializers.IntegerField()
 
 
 @extend_schema(
     description="List available capacity per hour for a given date.",
-    parameters=[ParameterSerializer],
-    responses={200: DataSerializer(many=True)},
+    request=BookingAvailabilityRequestSerializer,
+    responses={200: BookingAvailabilitySerializer(many=True)},
 )
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def list_availability(request) -> response.Response:
-    serializer = ParameterSerializer(data=request.query_params)
+    serializer = BookingAvailabilityRequestSerializer(data=request.query_params)
     serializer.is_valid(raise_exception=True)
-    data = booking_handler.query_availabilities(
+    data = booking_handler.handle_list_availability(
         date=serializer.validated_data["date_utc"],
         user_id=request.user.id,
     )
     return response.Response(
-        data=DataSerializer(data, many=True).data,
+        data=BookingAvailabilitySerializer(data, many=True).data,
         status=status.HTTP_200_OK,
     )

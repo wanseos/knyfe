@@ -23,7 +23,7 @@ class BookingAvailabilityTests(APITestCase):
             username="nonadmin2",
             password="password",
         )
-        pending_booking = booking_event_service.handle_create(
+        pending_booking = booking_event_service.handle_booking_created_event(
             user_id=cls.non_admin_user1.id,
             data={
                 "owner_id": cls.non_admin_user1.id,
@@ -33,7 +33,7 @@ class BookingAvailabilityTests(APITestCase):
             },
         )
         cls.pending_booking_key = pending_booking.booking_key
-        approved_booking = booking_event_service.handle_create(
+        approved_booking = booking_event_service.handle_booking_created_event(
             user_id=cls.non_admin_user2.id,
             data={
                 "owner_id": cls.non_admin_user2.id,
@@ -42,7 +42,7 @@ class BookingAvailabilityTests(APITestCase):
                 "applicants": 20_000,
             },
         )
-        approved_booking = booking_event_service.handle_update_booking(
+        approved_booking = booking_event_service.handle_booking_updated_event(
             user_id=cls.admin_user.id,
             booking_key=approved_booking.booking_key,
             data={"status": "APPROVED"},

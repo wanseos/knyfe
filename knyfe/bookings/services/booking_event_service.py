@@ -11,15 +11,11 @@ def generate_key() -> uuid.UUID:
     return uuid.uuid4()
 
 
-def get_booking_capacity() -> int:
-    return 50_000
-
-
 def passed_booking_deadline(starts_at: datetime.datetime) -> bool:
     return starts_at < timezone.now() + timezone.timedelta(days=3)
 
 
-def handle_create(user_id, data: dict) -> BookingProjection:
+def handle_booking_created_event(user_id, data: dict) -> BookingProjection:
     """create event and update projection"""
     obj = BookingEvent(
         user_id=user_id,
@@ -38,25 +34,26 @@ def handle_create(user_id, data: dict) -> BookingProjection:
     )
 
 
-def handle_update_booking(
+def handle_booking_updated_event(
     user_id,
     booking_key,
     data: dict,
 ) -> BookingProjection:
-    event = BookingEvent.objects.create(
+    obj = BookingEvent(
         user_id=user_id,
         timestamp=timezone.now(),
         booking_key=booking_key,
         event_type=BookingEvent.EventType.UPDATED,
         data=data,
     )
+    obj.save()
     return _apply_updated_event(
-        booking_key=event.booking_key,
-        data=event.data,
+        booking_key=obj.booking_key,
+        data=obj.data,
     )
 
 
-def handle_delete_booking(
+def handle_booking_deleted_event(
     user_id,
     booking_key,
 ) -> tuple:
@@ -115,6 +112,7 @@ def handle_list_bookings(user):
 
 
 def handle_retrieve_booking(user, booking_key):
+    # TODO: move to projection service
     if user.is_staff:
         return BookingProjection.objects.get(booking_key=booking_key)
     return BookingProjection.objects.filter(owner=user, booking_key=booking_key).get()
@@ -137,4 +135,4 @@ def booking_event_exceeds_capacity(
         )
         or 0
     )
-    return applicants > get_booking_capacity() - confirmed_applicants
+    return applicants > 50_000 - confirmed_applicants
