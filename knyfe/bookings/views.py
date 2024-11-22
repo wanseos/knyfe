@@ -49,6 +49,9 @@ class BookingViewSet(viewsets.ViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        responses={200: BookingSerializer},
+    )
     def retrieve(self, request, booking_key):
         result = booking_handler.handle_retrieve(
             user=request.user,
