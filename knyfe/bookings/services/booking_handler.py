@@ -67,11 +67,12 @@ def handle_update(
     user: User, booking_key: uuid.UUID, data: UpdateData
 ) -> Result[BookingData, str]:
     try:
-        obj = booking_event_service.handle_retrieve_booking(
-            user=user, booking_key=booking_key
-        )
+        obj = booking_projection_service.query_by_booking_key(booking_key=booking_key)
     except booking_projection_service.BookingProjection.DoesNotExist:
         return Result(error="Booking not found").with_metadata("status", 404)
+    if not user.is_staff and obj.owner_id != user.pk:
+        return Result(error="Booking not found").with_metadata("status", 404)
+    # TODO: optimize and simplify partial update.
     if "starts_at" not in data:
         data["starts_at"] = obj.starts_at
     if "ends_at" not in data:
@@ -116,10 +117,10 @@ def handle_update(
 
 def handle_delete(user: User, booking_key: uuid.UUID) -> Result[None, str]:
     try:
-        obj = booking_event_service.handle_retrieve_booking(
-            user=user, booking_key=booking_key
-        )
+        obj = booking_projection_service.query_by_booking_key(booking_key=booking_key)
     except booking_projection_service.BookingProjection.DoesNotExist:
+        return Result(error="Booking not found").with_metadata("status", 404)
+    if not user.is_staff and obj.owner_id != user.pk:
         return Result(error="Booking not found").with_metadata("status", 404)
     if not _validate_status_for_modification(user, obj.status):
         return Result(error="Confirmed booking cannot be deleted").with_metadata(
@@ -163,10 +164,10 @@ def handle_list(user: User) -> typing.List[BookingData]:
 
 def handle_retrieve(user: User, booking_key: uuid.UUID) -> Result[BookingData, str]:
     try:
-        obj = booking_event_service.handle_retrieve_booking(
-            user=user, booking_key=booking_key
-        )
+        obj = booking_projection_service.query_by_booking_key(booking_key=booking_key)
     except booking_projection_service.BookingProjection.DoesNotExist:
+        return Result(error="Booking not found").with_metadata("status", 404)
+    if not user.is_staff and obj.owner_id != user.pk:
         return Result(error="Booking not found").with_metadata("status", 404)
     return Result(
         value={

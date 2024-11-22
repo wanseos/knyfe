@@ -1,5 +1,6 @@
 import datetime
 import typing
+import uuid
 
 from django.db import connection, models
 from django.utils import timezone
@@ -9,6 +10,10 @@ from ..models import BookingProjection
 
 def get_booking_capacity() -> int:
     return 50_000
+
+
+def query_by_booking_key(booking_key: uuid.UUID) -> BookingProjection:
+    return BookingProjection.objects.get(booking_key=booking_key)
 
 
 def query_remaining_capacity(

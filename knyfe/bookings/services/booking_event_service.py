@@ -111,13 +111,6 @@ def handle_list_bookings(user):
     return BookingProjection.objects.filter(owner=user)
 
 
-def handle_retrieve_booking(user, booking_key):
-    # TODO: move to projection service
-    if user.is_staff:
-        return BookingProjection.objects.get(booking_key=booking_key)
-    return BookingProjection.objects.filter(owner=user, booking_key=booking_key).get()
-
-
 def booking_event_exceeds_capacity(
     starts_at: datetime.datetime,
     ends_at: datetime.datetime,
