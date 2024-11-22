@@ -2,8 +2,8 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, response, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 
-from ..models import BookingProjection, User
-from ..services import booking_event_service, booking_handler
+from .models import BookingProjection, User
+from .services import booking_event_service, booking_handler
 
 
 class BookingSerializer(serializers.Serializer):
