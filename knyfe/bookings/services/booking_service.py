@@ -6,6 +6,8 @@ from django.utils import timezone
 
 from ..models import Booking
 
+# TODO: Refactor to use booking event, and remove this service.
+
 
 def generate_key() -> uuid.UUID:
     return uuid.uuid4()
