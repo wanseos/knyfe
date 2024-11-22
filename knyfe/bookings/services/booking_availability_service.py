@@ -36,7 +36,7 @@ bookings_with_intervals AS (
         i.start_time + interval '1 hour' AS end_time,
         COALESCE(b.applicants, 0) AS applicants
     FROM intervals i
-    LEFT JOIN bookings_booking b
+    LEFT JOIN bookings_bookingprojection b
     ON b.owner_id = %s
        AND b.status = 'APPROVED'
        AND (

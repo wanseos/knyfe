@@ -1,7 +1,4 @@
-from django.contrib.auth import get_user_model
 from django.db import models
-
-User = get_user_model()
 
 
 class Booking(models.Model):
@@ -10,7 +7,7 @@ class Booking(models.Model):
         APPROVED = "APPROVED"
 
     key = models.UUIDField(unique=True, null=False)
-    owner = models.ForeignKey(User, on_delete=models.PROTECT)
+    owner = models.ForeignKey("User", on_delete=models.PROTECT)
     starts_at = models.DateTimeField()  # inclusive start
     ends_at = models.DateTimeField()  # exclusive end
     applicants = models.IntegerField()
