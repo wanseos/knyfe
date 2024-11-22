@@ -1,9 +1,9 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, response, serializers, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 
 from ..models import BookingProjection, User
-from ..services import booking_event_handler, booking_event_service
+from ..services import booking_event_service, booking_handler
 
 
 class BookingSerializer(serializers.Serializer):
@@ -64,6 +64,7 @@ class BookingViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def list(self, request):
+        # TODO: Refactor to use booking_handler.
         current_user = request.user
         qs = booking_event_service.handle_list_bookings(current_user)
         return response.Response(
@@ -93,7 +94,7 @@ class BookingViewSet(viewsets.ViewSet):
         ser = BookingSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
         request_data = ser.validated_data
-        result = booking_event_handler.handle_create(
+        result = booking_handler.handle_create(
             user=request.user,
             data={
                 "starts_at": request_data["starts_at"],
@@ -197,3 +198,32 @@ class BookingViewSet(viewsets.ViewSet):
             BookingSerializer(obj).data,
             status=status.HTTP_200_OK,
         )
+
+
+class ParameterSerializer(serializers.Serializer):
+    date_utc = serializers.DateField()
+
+
+class DataSerializer(serializers.Serializer):
+    index = serializers.IntegerField()
+    remaining = serializers.IntegerField()
+
+
+@extend_schema(
+    description="List available capacity per hour for a given date.",
+    parameters=[ParameterSerializer],
+    responses={200: DataSerializer(many=True)},
+)
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def list_availability(request) -> response.Response:
+    serializer = ParameterSerializer(data=request.query_params)
+    serializer.is_valid(raise_exception=True)
+    data = booking_handler.query_availabilities(
+        date=serializer.validated_data["date_utc"],
+        user_id=request.user.id,
+    )
+    return response.Response(
+        data=DataSerializer(data, many=True).data,
+        status=status.HTTP_200_OK,
+    )
