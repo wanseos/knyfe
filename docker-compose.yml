@@ -17,13 +17,8 @@ services:
     build:
       dockerfile: Dockerfile
     env_file: env/knyfe.env
-    command: >
-      sh -c "poetry install --no-interaction --no-ansi --no-root --no-cache &&
-            python3 manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./knyfe:/usr/src/app
-      - .poetry/venv:/usr/src/app/.venv
-      - .poetry/cache:/root/.cache/pypoetry
     ports:
       - 8000:8000
     depends_on:
